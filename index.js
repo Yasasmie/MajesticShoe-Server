@@ -3,18 +3,28 @@ const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
 
+// --- FIREBASE ADMIN SETUP ---
+
+// Log once if the private key is missing (helps in Render logs)
+if (!process.env.FIREBASE_PRIVATE_KEY) {
+  console.error("FIREBASE_PRIVATE_KEY is NOT set in environment variables");
+}
+
 // Build service account object from environment variables
 const serviceAccount = {
   type: "service_account",
   project_id: process.env.FIREBASE_PROJECT_ID,
   private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  // Render stores this as one line, so convert \n sequences to real newlines
-  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  // Env value should be a single line with literal '\n'; convert to real newlines
+  private_key: process.env.FIREBASE_PRIVATE_KEY
+    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+    : undefined,
   client_email: process.env.FIREBASE_CLIENT_EMAIL,
   client_id: process.env.FIREBASE_CLIENT_ID,
   auth_uri: process.env.FIREBASE_AUTH_URI,
   token_uri: process.env.FIREBASE_TOKEN_URI,
-  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+  auth_provider_x509_cert_url:
+    process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
   client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
   universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
 };
@@ -25,6 +35,8 @@ if (!admin.apps.length) {
     credential: admin.credential.cert(serviceAccount),
   });
 }
+
+// --- EXPRESS APP SETUP ---
 
 const app = express();
 

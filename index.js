@@ -3,18 +3,36 @@ const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
 
-// Load service account JSON from file in same folder
-const serviceAccount = require("./serviceAccountKey.json");
+// ---------- FIREBASE ADMIN SETUP (FROM ENV VAR JSON) ----------
 
-// Initialize Firebase Admin with service account
+// The full serviceAccountKey.json is stored in env var FIREBASE_SERVICE_ACCOUNT
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.error("FIREBASE_SERVICE_ACCOUNT is NOT set");
+}
+
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} catch (err) {
+  console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:", err);
+  serviceAccount = undefined;
+}
+
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
 }
 
+// ---------- EXPRESS APP ----------
+
 const app = express();
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(
+  cors({
+    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // In-memory shoe list (replace with DB later)
@@ -45,7 +63,9 @@ async function verifyFirebaseToken(req, res, next) {
 // Simple helper: only allow admin@gmail.com
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.email !== "admin@gmail.com") {
-    return res.status(403).json({ error: "Only admin can perform this action" });
+    return res
+      .status(403)
+      .json({ error: "Only admin can perform this action" });
   }
   next();
 }
@@ -72,39 +92,53 @@ app.post("/api/profile", verifyFirebaseToken, async (req, res) => {
 // --- SHOES API ---
 
 // Admin: create a shoe
-app.post("/api/admin/shoes", verifyFirebaseToken, requireAdmin, (req, res) => {
-  try {
-    const {
-      name,
-      price,
-      category,
-      description,
-      images,
-      tag,
-    } = req.body;
+app.post(
+  "/api/admin/shoes",
+  verifyFirebaseToken,
+  requireAdmin,
+  (req, res) => {
+    try {
+      const {
+        name,
+        price,
+        category,
+        description,
+        images,
+        tag,
+      } = req.body;
 
-    if (!name || !price || !category || !images || !Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({ error: "Missing required fields" });
+      if (
+        !name ||
+        !price ||
+        !category ||
+        !images ||
+        !Array.isArray(images) ||
+        images.length === 0
+      ) {
+        return res
+          .status(400)
+          .json({ error: "Missing required fields" });
+      }
+
+      const newShoe = {
+        id: nextShoeId++,
+        name,
+        price,
+        category,
+        description: description || "",
+        images,
+        tag: tag || "",
+        createdAt: new Date().toISOString(),
+      };
+
+      shoes.push(newShoe);
+      res.status(201).json(newShoe);
+    } catch (err) {
+      console.error("Failed to create shoe:", err);
+      res.status(500).json({ error: "Failed to create shoe" });
     }
-
-    const newShoe = {
-      id: nextShoeId++,
-      name,
-      price,
-      category,
-      description: description || "",
-      images,
-      tag: tag || "",
-      createdAt: new Date().toISOString(),
-    };
-
-    shoes.push(newShoe);
-    res.status(201).json(newShoe);
-  } catch (err) {
-    console.error("Failed to create shoe:", err);
-    res.status(500).json({ error: "Failed to create shoe" });
   }
-});
+);
 
 // Public: list shoes
 app.get("/api/shoes", (req, res) => {
@@ -123,5 +157,5 @@ app.get("/api/shoes/:id", (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`Backend listening on http://localhost:${PORT}`);
+  console.log(`Backend listening on port ${PORT}`);
 });

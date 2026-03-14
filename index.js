@@ -2,11 +2,29 @@
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
+require("dotenv").config();
 
-// ---------- FIREBASE ADMIN SETUP (USING JSON FILE) ----------
+// ---------- FIREBASE ADMIN SETUP ----------
 
-// Load the JSON file directly (make sure this path is correct)
-const serviceAccount = require("./serviceAccountKey.json");
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } catch (err) {
+    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT:", err);
+    process.exit(1);
+  }
+} else {
+  try {
+    serviceAccount = require("./serviceAccountKey.json");
+  } catch (err) {
+    console.error(
+      "Firebase Admin credentials not found. Set FIREBASE_SERVICE_ACCOUNT on the server or provide serviceAccountKey.json locally."
+    );
+    process.exit(1);
+  }
+}
 
 if (!admin.apps.length) {
   admin.initializeApp({
